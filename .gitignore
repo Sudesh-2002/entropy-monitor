@@ -1,0 +1,6 @@
+node_modules/
+.ignored_node_modules/
+dist/
+*.db
+*.db-journal
+.entropy-monitor/
