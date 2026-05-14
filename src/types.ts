@@ -29,8 +29,23 @@ export interface DuplicationResult {
   percentage: number;
 }
 
+export interface DeadCodeItem {
+  filePath: string;
+  type: 'unused-export' | 'unused-file' | 'unresolved-import';
+  name?: string;
+}
+
+export interface DeadCodeResult {
+  score: number;
+  items: DeadCodeItem[];
+  unusedExports: number;
+  unusedFiles: number;
+  unresolvedImports: number;
+}
+
 export interface EntropySnapshot {
   timestamp: number;
   coupling: CouplingResult;
   duplication: DuplicationResult;
+  deadCode: DeadCodeResult;
 }
