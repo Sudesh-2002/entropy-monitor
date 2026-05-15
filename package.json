@@ -1,36 +1,57 @@
 {
   "name": "entropy-monitor",
   "version": "0.1.0",
-  "description": "Tracks codebase disorder over time — coupling, duplication, dead code",
+  "description": "Tracks codebase disorder over time — coupling, duplication, and dead code visualized as health metrics",
   "type": "module",
   "bin": {
-    "entropy-monitor": "./dist/cli.js"
+    "entropy-monitor": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm build"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "entropy",
+    "code-quality",
+    "technical-debt",
+    "coupling",
+    "duplication",
+    "dead-code",
+    "typescript",
+    "cli",
+    "metrics"
+  ],
+  "author": "Sudesh Hansika <sudeshhansikamahanama@gmail.com>",
+  "license": "MIT",
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
-    "chalk": "^5.6.2",
-    "cli-table3": "^0.6.5",
-    "commander": "^14.0.3",
-    "glob": "^13.0.6",
-    "jscpd": "^4.1.1",
-    "knip": "^6.13.1",
-    "ora": "^9.4.0"
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.3",
+    "commander": "^12.0.0",
+    "glob": "^10.3.10",
+    "jscpd": "^3.5.10",
+    "knip": "^5.0.0",
+    "ora": "^8.0.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.7.0",
-    "@typescript-eslint/eslint-plugin": "^8.59.3",
-    "@typescript-eslint/parser": "^8.59.3",
-    "@typescript-eslint/typescript-estree": "^8.59.3",
-    "eslint": "^10.3.0"
+    "@types/node": "^20.11.5",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@typescript-eslint/typescript-estree": "^7.0.0",
+    "eslint": "^8.56.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
   }
 }
