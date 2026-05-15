@@ -26,31 +26,34 @@ program
   .option('--skip-duplication', 'skip duplication analysis')
   .option('--skip-deadcode', 'skip dead code analysis')
   .option('--no-save', 'print results but do not save to history')
+  .option('--json', 'output results as JSON instead of formatted report')
   .action(async (targetPath: string, opts: {
     top: string;
     skipDuplication: boolean;
     skipDeadcode: boolean;
     save: boolean;
+    json: boolean;
   }) => {
     const root = path.resolve(targetPath);
     const topN = parseInt(opts.top, 10);
 
-    const s1 = ora('Analyzing coupling…').start();
+    // Run analyzers silently if --json mode
+    const s1 = opts.json ? null : ora('Analyzing coupling…').start();
     const coupling = await analyzeCoupling(root);
-    s1.succeed('Coupling analysis done');
+    s1?.succeed('Coupling analysis done');
 
     let duplication;
     if (!opts.skipDuplication) {
-      const s2 = ora('Analyzing duplication…').start();
+      const s2 = opts.json ? null : ora('Analyzing duplication…').start();
       duplication = await analyzeDuplication(root);
-      s2.succeed('Duplication analysis done');
+      s2?.succeed('Duplication analysis done');
     }
 
     let deadCode;
     if (!opts.skipDeadcode) {
-      const s3 = ora('Analyzing dead code…').start();
+      const s3 = opts.json ? null : ora('Analyzing dead code…').start();
       deadCode = await analyzeDeadCode(root);
-      s3.succeed('Dead code analysis done');
+      s3?.succeed('Dead code analysis done');
     }
 
     const scores = [coupling.score];
@@ -58,19 +61,119 @@ program
     if (deadCode) scores.push(deadCode.score);
     const overallScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 
+    // Save to DB
     let snapshotId: number | null = null;
     if (opts.save !== false) {
       const db = openDb(root);
       const git = getGitInfo(root);
       snapshotId = saveSnapshot(db, {
-        coupling, duplication, deadCode, overallScore,
+        coupling,
+        duplication,
+        deadCode,
+        overallScore,
         gitSha: git.sha ?? undefined,
         gitBranch: git.branch ?? undefined,
       });
       db.close();
     }
 
-    printReport({ coupling, duplication, deadCode, overallScore, snapshotId, topN });
+    // JSON output mode — clean, parseable, no colors
+    if (opts.json) {
+      const jsonResult = {
+        overallScore,
+        couplingScore: coupling.score,
+        duplicationScore: duplication?.score ?? 0,
+        deadcodeScore: deadCode?.score ?? 0,
+        totalFiles: coupling.totalFiles,
+        totalLines: duplication?.totalLines ?? 0,
+        duplicateLines: duplication?.duplicateLines ?? 0,
+        duplicateBlocks: duplication?.duplicateBlocks.length ?? 0,
+        unusedExports: deadCode?.unusedExports ?? 0,
+        unusedFiles: deadCode?.unusedFiles ?? 0,
+        unresolvedImports: deadCode?.unresolvedImports ?? 0,
+        snapshotId,
+        scannedAt: Date.now(),
+      };
+      process.stdout.write(JSON.stringify(jsonResult) + '\n');
+      return;
+    }
+
+    // Normal formatted report (existing code below unchanged)
+    console.log('');
+    console.log(chalk.bold('═══════════════════════════════════════'));
+    console.log(chalk.bold('  Entropy Monitor Report'));
+    console.log(chalk.bold('═══════════════════════════════════════'));
+    console.log('');
+    console.log(`  Overall entropy:   ${formatScore(overallScore)}  ${scoreBar(overallScore)}`);
+    console.log(`  Coupling score:    ${formatScore(coupling.score)}`);
+    if (duplication) console.log(`  Duplication score: ${formatScore(duplication.score)}  (${duplication.percentage}% dup lines)`);
+    if (deadCode)    console.log(`  Dead code score:   ${formatScore(deadCode.score)}  (${deadCode.items.length} issues)`);
+    console.log('');
+    console.log(chalk.dim(`  Files scanned:      ${coupling.totalFiles}`));
+    if (duplication) console.log(chalk.dim(`  Total lines:        ${duplication.totalLines}`));
+    if (deadCode) {
+      console.log(chalk.dim(`  Unused exports:     ${deadCode.unusedExports}`));
+      console.log(chalk.dim(`  Unused files:       ${deadCode.unusedFiles}`));
+      console.log(chalk.dim(`  Unresolved imports: ${deadCode.unresolvedImports}`));
+    }
+    if (snapshotId) console.log(chalk.dim(`  Snapshot ID:        #${snapshotId}`));
+    console.log('');
+
+    console.log(chalk.bold('Most coupled files:'));
+    [...coupling.modules]
+      .sort((a, b) => b.fanOut - a.fanOut)
+      .slice(0, topN)
+      .filter(m => m.fanOut > 0 || m.fanIn > 0)
+      .forEach(m => {
+        const bar = instBar(m.instability);
+        console.log(
+          `  ${chalk.cyan(m.filePath.padEnd(48))}` +
+          `  out:${String(m.fanOut).padStart(3)}` +
+          `  in:${String(m.fanIn).padStart(3)}` +
+          `  ${bar} ${m.instability.toFixed(2)}`
+        );
+      });
+
+    if (duplication) {
+      console.log('');
+      if (duplication.duplicateBlocks.length > 0) {
+        console.log(chalk.bold('Duplicate blocks:'));
+        duplication.duplicateBlocks
+          .sort((a, b) => b.lines - a.lines)
+          .slice(0, topN)
+          .forEach(d => console.log(
+            `  ${chalk.yellow(d.file1)}:${d.startLine1}` +
+            chalk.dim(' ↔ ') +
+            `${chalk.yellow(d.file2)}:${d.startLine2}` +
+            chalk.dim(` (${d.lines} lines)`)
+          ));
+      } else {
+        console.log(chalk.green('  No duplicate blocks found.'));
+      }
+    }
+
+    if (deadCode) {
+      console.log('');
+      if (deadCode.items.length > 0) {
+        console.log(chalk.bold('Dead code issues:'));
+        deadCode.items
+          .filter(i => i.type === 'unused-file')
+          .slice(0, topN)
+          .forEach(i => console.log(`    ${chalk.red('✗')} ${i.filePath}`));
+        deadCode.items
+          .filter(i => i.type === 'unused-export')
+          .slice(0, topN)
+          .forEach(i => console.log(`    ${chalk.yellow('~')} ${i.filePath} ${chalk.dim('→')} ${i.name}`));
+        deadCode.items
+          .filter(i => i.type === 'unresolved-import')
+          .slice(0, topN)
+          .forEach(i => console.log(`    ${chalk.red('?')} ${i.filePath} ${chalk.dim('→')} ${i.name}`));
+      } else {
+        console.log(chalk.green('  No dead code found.'));
+      }
+    }
+
+    console.log('');
   });
 
 // ─── history ──────────────────────────────────────────────────────────────────
