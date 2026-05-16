@@ -1,6 +1,6 @@
 {
   "name": "entropy-monitor",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Tracks codebase disorder over time — coupling, duplication, and dead code visualized as health metrics",
   "type": "module",
   "bin": {
