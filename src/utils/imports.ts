@@ -1,14 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-
-const IMPORT_RE = /(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
-const REQUIRE_RE = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+import type { Language, LanguageProfile } from './language.js';
 
 function normalize(p: string): string {
   return p.replace(/\\/g, '/');
 }
 
-export function extractImports(filePath: string): string[] {
+export function extractImports(
+  filePath: string,
+  profile: LanguageProfile
+): string[] {
   let source: string;
   try {
     source = fs.readFileSync(filePath, 'utf-8');
@@ -18,14 +19,17 @@ export function extractImports(filePath: string): string[] {
 
   const imports = new Set<string>();
   const dir = path.dirname(filePath);
+  const lang = profile.language;
 
-  for (const re of [IMPORT_RE, REQUIRE_RE]) {
+  for (const re of profile.importPattern) {
     re.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = re.exec(source)) !== null) {
       const spec = match[1];
-      if (spec.startsWith('.')) {
-        const resolved = resolveLocal(dir, spec);
+      if (!spec) continue;
+
+      if (isRelative(spec, lang)) {
+        const resolved = resolveLocal(dir, spec, profile.extensions);
         if (resolved) imports.add(normalize(resolved));
       }
     }
@@ -34,19 +38,36 @@ export function extractImports(filePath: string): string[] {
   return [...imports];
 }
 
-function resolveLocal(dir: string, spec: string): string | null {
-  // Strip .js extension — TypeScript ESM uses .js imports that map to .ts files
+function isRelative(spec: string, lang: Language): boolean {
+  if (lang === 'typescript' || lang === 'javascript') {
+    return spec.startsWith('.');
+  }
+  if (lang === 'python') {
+    return spec.startsWith('.');
+  }
+  if (lang === 'ruby') {
+    return true; // require_relative is always relative
+  }
+  if (lang === 'cpp') {
+    return spec.includes('/') && !spec.startsWith('<');
+  }
+  return false;
+}
+
+function resolveLocal(
+  dir: string,
+  spec: string,
+  extensions: string[]
+): string | null {
+  // Strip .js extension for TS/ESM imports
   const stripped = spec.replace(/\.js$/, '');
 
   const candidates = [
     stripped,
-    `${stripped}.ts`,
-    `${stripped}.tsx`,
-    `${stripped}/index.ts`,
-    `${stripped}/index.tsx`,
-    // also try original spec in case it really is .js
+    ...extensions.map(ext => `${stripped}.${ext}`),
+    ...extensions.map(ext => `${stripped}/index.${ext}`),
     spec,
-    `${spec}.ts`,
+    ...extensions.map(ext => `${spec}.${ext}`),
   ];
 
   for (const candidate of candidates) {

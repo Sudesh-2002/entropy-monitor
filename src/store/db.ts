@@ -17,7 +17,7 @@ export interface SnapshotRow {
   duplicate_lines: number;
   unused_exports: number;
   unused_files: number;
-  payload: string; // full JSON blob
+  payload: string;
 }
 
 export function openDb(rootPath: string): Database.Database {
