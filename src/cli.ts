@@ -17,7 +17,6 @@ program
   .description('Tracks codebase disorder over time')
   .version('0.1.0');
 
-// ─── scan ─────────────────────────────────────────────────────────────────────
 program
   .command('scan')
   .description('Scan a codebase and record an entropy snapshot')
@@ -61,7 +60,6 @@ program
     if (deadCode) scores.push(deadCode.score);
     const overallScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
 
-    // Save to DB
     let snapshotId: number | null = null;
     if (opts.save !== false) {
       const db = openDb(root);
@@ -176,7 +174,6 @@ program
     console.log('');
   });
 
-// ─── history ──────────────────────────────────────────────────────────────────
 program
   .command('history')
   .description('Show entropy trend over time')
@@ -221,7 +218,6 @@ program
     console.log('');
   });
 
-// ─── diff ─────────────────────────────────────────────────────────────────────
 program
   .command('diff')
   .description('Compare two snapshots')
@@ -262,7 +258,6 @@ program
     console.log('');
   });
 
-// ─── report ───────────────────────────────────────────────────────────────────
 program
   .command('report')
   .description('Generate an HTML dashboard')
@@ -286,7 +281,6 @@ program
     console.log(chalk.dim('  Open it in any browser — no server needed.\n'));
   });
 
-// ─── ci ───────────────────────────────────────────────────────────────────────
 program
   .command('ci')
   .description('Fail if entropy regressed since last snapshot (for CI pipelines)')
@@ -339,7 +333,6 @@ program
       }
     }
 
-    // Print result
     console.log('');
     console.log(chalk.bold('  Entropy CI Gate'));
     console.log(`  Latest snapshot: #${curr.id}  ${formatDate(curr.timestamp)}`);
@@ -359,7 +352,6 @@ program
 
 program.parse();
 
-// ─── shared helpers ───────────────────────────────────────────────────────────
 function printReport(opts: {
   coupling: Awaited<ReturnType<typeof analyzeCoupling>>;
   duplication?: Awaited<ReturnType<typeof analyzeDuplication>>;

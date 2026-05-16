@@ -18,7 +18,6 @@ export async function analyzeDuplication(rootPath: string): Promise<DuplicationR
     // jscpd exits with code 1 when duplicates are found — that's expected
   }
 
-  // jscpd writes to <output>/jscpd-report.json
   const jscpdReport = path.join(tmpDir, 'jscpd-report.json');
 
   if (!fs.existsSync(jscpdReport)) {
@@ -70,7 +69,6 @@ function emptyResult(): DuplicationResult {
   };
 }
 
-// jscpd JSON report shape (partial)
 interface JscpdReport {
   duplicates: Array<{
     firstFile: { name: string; start: number; end: number };
